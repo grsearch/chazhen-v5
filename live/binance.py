@@ -23,13 +23,16 @@ REST = "https://api.binance.com"
 
 # ── 精度工具 ─────────────────────────────────────────
 
+def _decimals(d: Decimal) -> int:
+    """从 Decimal 精确获取小数位数，避免科学计数法陷阱（如 1E-7）"""
+    sign, digits, exp = d.as_tuple()
+    return max(0, -exp)
+
 def fmt_price(price: float, tick: float) -> str:
     tick_d  = Decimal(str(tick))
     price_d = Decimal(str(price))
     result  = (price_d / tick_d).to_integral_value(rounding=ROUND_DOWN) * tick_d
-    s = str(tick_d.normalize())
-    decimals = len(s.split(".")[-1]) if "." in s else 0
-    return f"{float(result):.{decimals}f}"
+    return f"{result:.{_decimals(tick_d)}f}"
 
 def fmt_qty(qty: float, step: float, min_qty: float) -> str:
     step_d = Decimal(str(step))
@@ -37,9 +40,7 @@ def fmt_qty(qty: float, step: float, min_qty: float) -> str:
     result = (qty_d / step_d).to_integral_value(rounding=ROUND_DOWN) * step_d
     if float(result) < min_qty:
         raise ValueError(f"qty {float(result):.8f} < min_qty {min_qty}")
-    s = str(step_d.normalize())
-    decimals = len(s.split(".")[-1]) if "." in s else 0
-    return f"{float(result):.{decimals}f}"
+    return f"{result:.{_decimals(step_d)}f}"
 
 
 # ══════════════════════════════════════════════════════
