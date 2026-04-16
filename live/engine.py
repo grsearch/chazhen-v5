@@ -285,16 +285,21 @@ class Engine:
 
     # ── Bot 启停 ──────────────────────────────────
 
+    def _count_positions(self) -> int:
+        """返回当前所有Bot中有持仓的数量"""
+        return sum(1 for b in self._bots.values() if b._pos is not None)
+
     def _start_bot(self, symbol: str,
                    loop: asyncio.AbstractEventLoop) -> None:
         with self._lock:
             if symbol in self._bots and self._bots[symbol].running:
                 return
             bot = Bot(
-                symbol   = symbol,
-                cfg      = self.cfg,
-                client   = self._aclient,
-                on_trade = self._on_trade,
+                symbol             = symbol,
+                cfg                = self.cfg,
+                client             = self._aclient,
+                on_trade           = self._on_trade,
+                get_pos_count = self._count_positions,
             )
             self._bots[symbol] = bot
         # bot.start 内部使用 run_coroutine_threadsafe，线程安全
