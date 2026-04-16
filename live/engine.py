@@ -288,13 +288,9 @@ class Engine:
                 on_trade = self._on_trade,
             )
             self._bots[symbol] = bot
-        asyncio.run_coroutine_threadsafe(
-            self._async_start_bot(bot, loop), loop
-        )
-
-    async def _async_start_bot(self, bot: Bot,
-                                loop: asyncio.AbstractEventLoop) -> None:
+        # bot.start 内部使用 run_coroutine_threadsafe，线程安全
         bot.start(loop)
+        self._log(symbol, "Bot 已启动")
 
     # ── 成交回调 ─────────────────────────────────
 

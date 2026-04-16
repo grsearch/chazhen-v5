@@ -67,7 +67,13 @@ class Bot:
     def start(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop   = loop
         self.running = True
-        self._task   = loop.create_task(self._run())
+        # 用 run_coroutine_threadsafe 保证线程安全（可从任意线程调用）
+        future = asyncio.run_coroutine_threadsafe(self._start_task(), loop)
+        # 不阻塞等待，让 loop 异步执行
+        _ = future
+
+    async def _start_task(self) -> None:
+        self._task = asyncio.ensure_future(self._run())
 
     def stop(self) -> None:
         self.running = False
