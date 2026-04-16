@@ -15,12 +15,24 @@ STATE_FILE  = os.path.join(DATA_DIR, "state.json")
 TRADES_FILE = os.path.join(DATA_DIR, "trades.json")
 LOG_FILE    = os.path.join(DATA_DIR, "bot.log")
 
-# ── 策略常量（回测验证，不开放修改）────────────────
-ORDER_PCT      = 2.0    # 挂单深度：收盘价 -2%
-HOLD_MAX_S     = 10     # 最多持仓秒数
-STOP_LOSS_PCT  = 1.0    # 止损 %（相对买入价）
-MIN_PROFIT_PCT = 0.25   # 最小盈利阈值 %（扣手续费后）
-FEE_RATE       = 0.001  # 单边手续费
+# ── 策略默认值（用户可在 dashboard 调整）──────────
+ORDER_PCT      = 2.0    # 挂单深度默认值
+HOLD_MAX_S     = 10     # 最多持仓秒数默认值
+STOP_LOSS_PCT  = 1.0    # 止损 % 默认值
+MIN_PROFIT_PCT = 0.25   # 最小盈利阈值 % 默认值
+FEE_RATE       = 0.001  # 单边手续费（固定）
+
+def ORDER_PCT_CFG(cfg: dict) -> float:
+    return float(cfg.get("order_pct", ORDER_PCT))
+
+def HOLD_MAX_CFG(cfg: dict) -> int:
+    return int(cfg.get("hold_max_s", HOLD_MAX_S))
+
+def STOP_LOSS_CFG(cfg: dict) -> float:
+    return float(cfg.get("stop_loss_pct", STOP_LOSS_PCT))
+
+def MIN_PROFIT_CFG(cfg: dict) -> float:
+    return float(cfg.get("min_profit_pct", MIN_PROFIT_PCT))
 
 # 涨幅榜
 SCAN_INTERVAL  = 15 * 60   # 15 分钟扫一次
@@ -38,6 +50,11 @@ DEFAULTS: dict = {
     "min_gain_24h":       30.0,      # 涨幅榜筛选：最低 24h 涨幅 %
     "min_volume_usdt":    500_000.0, # 涨幅榜筛选：最低 24h 成交量
     "auto_scan":          True,      # 是否自动扫描涨幅榜
+    # 策略参数（可在 dashboard 调整）
+    "order_pct":          2.0,       # 挂单深度 %（收盘价 -X%）
+    "hold_max_s":         10,        # 最多持仓秒数
+    "stop_loss_pct":      1.0,       # 止损 %
+    "min_profit_pct":     1.0,       # 最小盈利阈值 %
 }
 
 _lock = threading.Lock()

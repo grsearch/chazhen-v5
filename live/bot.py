@@ -23,7 +23,7 @@ from typing import Callable, Optional
 
 from binance import AsyncClient, fmt_price, fmt_qty
 from config import (
-    ORDER_PCT, HOLD_MAX_S, STOP_LOSS_PCT, MIN_PROFIT_PCT,
+    ORDER_PCT_CFG, HOLD_MAX_CFG, STOP_LOSS_CFG, MIN_PROFIT_CFG,
     append_trade, write_log,
 )
 
@@ -168,7 +168,8 @@ class Bot:
                     sl = o["fill_price"] * (1 - STOP_LOSS_PCT / 100)
                     self._log(
                         f"✅ 买入 {o['fill_price']:.6f} qty={o['qty']:.6f} "
-                        f"止损={sl:.6f} 最多{HOLD_MAX_S}s"
+                        f"止损={o['fill_price']*(1-STOP_LOSS_CFG(self._cfg)/100):.6f} "
+                        f"最多{HOLD_MAX_CFG(self._cfg)}s"
                     )
             self._order = None
 
@@ -204,13 +205,16 @@ class Bot:
         entry  = pos["entry_price"]
         pnl    = (close_p - entry) / entry * 100
 
+        sl  = STOP_LOSS_CFG(self._cfg)
+        tp  = MIN_PROFIT_CFG(self._cfg)
+        hms = HOLD_MAX_CFG(self._cfg)
         reason = None
-        if pnl >= MIN_PROFIT_PCT:
+        if pnl >= tp:
             reason = f"止盈 +{pnl:.3f}%"
-        elif pnl <= -STOP_LOSS_PCT:
+        elif pnl <= -sl:
             reason = f"止损 {pnl:.3f}%"
-        elif hold_s >= HOLD_MAX_S:
-            reason = f"超时{HOLD_MAX_S}s ({pnl:+.3f}%)"
+        elif hold_s >= hms:
+            reason = f"超时{hms}s ({pnl:+.3f}%)"
 
         if reason:
             await self._sell(close_p, ts, mode, reason)
@@ -223,7 +227,12 @@ class Bot:
         entry     = pos["entry_price"]
         sell_p    = price
 
+        lat = 0
         if mode == "live":
+            if not self._client.api_key:
+                self._log("❌ 实盘模式需要填写 API Key")
+                self._pos = pos
+                return
             try:
                 q_str  = fmt_qty(qty, self._filt["step"], self._filt["min_qty"])
                 t0     = time.monotonic()
@@ -238,8 +247,6 @@ class Bot:
                 self._log(f"❌ 卖出失败: {e}，恢复持仓")
                 self._pos = pos
                 return
-        else:
-            lat = 0
 
         pnl_pct  = (sell_p - entry) / entry * 100
         pnl_usdt = (sell_p - entry) * qty
@@ -281,13 +288,13 @@ class Bot:
             try:
                 bal = await self._client.usdt_balance()
                 if bal < total * 0.5:
-                    self._log(f"余额不足 {bal:.2f}U < {total*0.5:.1f}U，跳过")
+                    self._log(f"余额不足 {bal:.2f}U < {total*0.5:.1f}U，跳过挂单")
                     return
             except Exception as e:
                 self._log(f"余额查询失败: {e}")
                 return
 
-        price = close_p * (1 - ORDER_PCT / 100)
+        price = close_p * (1 - ORDER_PCT_CFG(self._cfg) / 100)
         try:
             p_str = fmt_price(price, self._filt["tick"])
             qty   = total / float(p_str)
@@ -307,6 +314,9 @@ class Bot:
         }
 
         if mode == "live":
+            if not self._client.api_key:
+                self._log("❌ 实盘模式需要填写 API Key")
+                return
             try:
                 t0   = time.monotonic()
                 resp = await self._client.limit_buy(
@@ -315,14 +325,17 @@ class Bot:
                 lat  = (time.monotonic() - t0) * 1000
                 rec["order_id"] = resp.get("orderId")
                 self._log(
-                    f"挂单 收盘={close_p:.6f} → {p_str}(-{ORDER_PCT}%) "
+                    f"挂单 收盘={close_p:.6f} → {p_str}(-{ORDER_PCT_CFG(self._cfg)}%) "
                     f"qty={q_str} 延迟{lat:.0f}ms"
                 )
             except Exception as e:
                 self._log(f"下单失败: {e}")
                 return
         else:
-            self._log(f"[paper] 挂单 收盘={close_p:.6f} → {p_str}(-{ORDER_PCT}%)")
+            self._log(
+                f"[paper] 挂单 收盘={close_p:.6f} → {p_str}"
+                f"(-{ORDER_PCT_CFG(self._cfg)}%)"
+            )
 
         self._order = rec
 

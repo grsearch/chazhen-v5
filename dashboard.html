@@ -359,8 +359,10 @@ nav {
 <div class="main pane" id="pane-config">
   <div class="row">
     <div class="card" style="flex:1">
-      <div class="info-box">
-        策略参数已由回测优化固定：挂单 <b>-2%</b>，持仓最多 <b>10秒</b>，止损 <b>-1%</b>，最小盈利 <b>0.25%</b>。
+      <div class="info-box" id="strategyHint">
+        当前策略：挂单 <b id="hintOPct">-2%</b>，持仓最多 <b id="hintHold">10秒</b>，
+        止损 <b id="hintSL">-1%</b>，最小盈利 <b id="hintTP">0.25%</b>。
+        （参数可在下方调整，保存后立即生效）
       </div>
       <div id="livewarn" class="warn-box" style="display:none">
         ⚠ 实盘模式：请确保 API Key 已正确填写，且已开启现货交易权限。
@@ -400,6 +402,32 @@ nav {
         </div>
       </div>
 
+      <div style="margin:18px 0 10px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">
+        策略参数
+      </div>
+      <div class="cfg-grid">
+        <div class="field">
+          <label>挂单深度 (%)</label>
+          <input id="cfgOrderPct" type="number" min="0.1" max="10" step="0.1">
+          <span class="hint">收盘价 -X% 挂限价买单（回测最优 2.0）</span>
+        </div>
+        <div class="field">
+          <label>止损 (%)</label>
+          <input id="cfgSL" type="number" min="0.1" max="10" step="0.1">
+          <span class="hint">买入后跌超此值止损（回测最优 1.0）</span>
+        </div>
+        <div class="field">
+          <label>最小盈利阈值 (%)</label>
+          <input id="cfgTP" type="number" min="0.1" max="5" step="0.05">
+          <span class="hint">超过此值立即卖出（回测最优 0.25）</span>
+        </div>
+        <div class="field">
+          <label>最多持仓秒数</label>
+          <input id="cfgHoldMax" type="number" min="1" max="60" step="1">
+          <span class="hint">超时强制市价卖出（回测最优 10）</span>
+        </div>
+      </div>
+
       <div style="margin-top:20px;display:flex;gap:10px">
         <button class="btn btn-green" onclick="saveCfg()">保存配置</button>
         <button class="btn btn-ghost" onclick="loadCfgForm()">重新加载</button>
@@ -407,15 +435,15 @@ nav {
     </div>
 
     <div class="card" style="width:280px;flex-shrink:0">
-      <div class="card-title">策略说明</div>
+      <div class="card-title">策略说明（实时）</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.9">
         <p><b style="color:var(--text)">入场</b></p>
-        <p>每根1秒K线收盘后<br>以收盘价 <b style="color:var(--green)">-2%</b> 挂限价买单</p>
+        <p>每根1秒K线收盘后<br>以收盘价 <span id="s-opct" style="color:var(--green);font-weight:700">-2%</span> 挂限价买单</p>
         <br>
         <p><b style="color:var(--text)">出场（三选一）</b></p>
-        <p>✅ 盈利 ≥ <b style="color:var(--green)">0.25%</b> → 市价卖出</p>
-        <p>🛑 亏损 ≥ <b style="color:var(--red)">1.0%</b> → 止损</p>
-        <p>⏱ 持仓满 <b style="color:var(--amber)">10秒</b> → 强制卖出</p>
+        <p>✅ 盈利 ≥ <span id="s-tp" style="color:var(--green);font-weight:700">0.25%</span> → 市价卖出</p>
+        <p>🛑 亏损 ≥ <span id="s-sl" style="color:var(--red);font-weight:700">1.0%</span> → 止损</p>
+        <p>⏱ 持仓满 <span id="s-hold" style="color:var(--amber);font-weight:700">10秒</span> → 强制卖出</p>
         <br>
         <p><b style="color:var(--text)">K线未成交</b></p>
         <p>下一秒收盘时撤单重挂</p>
@@ -743,17 +771,40 @@ async function doRemove(sym) {
 // ══════════════════════════════════════════════════════
 // 配置
 // ══════════════════════════════════════════════════════
+function updateStrategyDisplay(c) {
+  const op = c.order_pct || 2.0;
+  const sl = c.stop_loss_pct || 1.0;
+  const tp = c.min_profit_pct || 1.0;
+  const hm = c.hold_max_s || 10;
+  // 更新配置页右侧说明
+  const ids = {'s-opct': `-${op}%`, 's-sl': `${sl}%`, 's-tp': `${tp}%`, 's-hold': `${hm}秒`};
+  for (const [id, val] of Object.entries(ids)) {
+    const el = $(id); if (el) el.textContent = val;
+  }
+  // 更新顶部提示条
+  const hint = $('hintOPct'); if(hint) hint.textContent = `-${op}%`;
+  const hh = $('hintHold'); if(hh) hh.textContent = `${hm}秒`;
+  const hs = $('hintSL'); if(hs) hs.textContent = `-${sl}%`;
+  const ht = $('hintTP'); if(ht) ht.textContent = `${tp}%`;
+}
+
 async function loadCfgForm() {
   try {
     const c = await api('/api/config');
-    $('cfgMode').value   = c.mode || 'paper';
-    $('cfgSize').value   = c.position_size_usdt || 100;
-    $('cfgKey').value    = c.api_key || '';
-    $('cfgSecret').value = '';   // secret 不回显
-    $('cfgGain').value   = c.min_gain_24h || 30;
-    $('cfgVol').value    = c.min_volume_usdt || 500000;
-    $('cfgMaxPos').value = c.max_positions || 3;
+    $('cfgMode').value     = c.mode || 'paper';
+    $('cfgSize').value     = c.position_size_usdt || 100;
+    $('cfgKey').value      = c.api_key || '';
+    $('cfgSecret').value   = '';
+    $('cfgGain').value     = c.min_gain_24h || 30;
+    $('cfgVol').value      = c.min_volume_usdt || 500000;
+    $('cfgMaxPos').value   = c.max_positions || 3;
+    $('cfgOrderPct').value = c.order_pct || 2.0;
+    $('cfgSL').value       = c.stop_loss_pct || 1.0;
+    $('cfgTP').value       = c.min_profit_pct || 1.0;
+    $('cfgHoldMax').value  = c.hold_max_s || 10;
     $('livewarn').style.display = c.mode === 'live' ? 'block' : 'none';
+    // 更新说明区域
+    updateStrategyDisplay(c);
   } catch(e) {}
 }
 
@@ -769,12 +820,20 @@ async function saveCfg() {
     min_gain_24h:       parseFloat($('cfgGain').value),
     min_volume_usdt:    parseFloat($('cfgVol').value),
     max_positions:      parseInt($('cfgMaxPos').value),
+    order_pct:          parseFloat($('cfgOrderPct').value),
+    stop_loss_pct:      parseFloat($('cfgSL').value),
+    min_profit_pct:     parseFloat($('cfgTP').value),
+    hold_max_s:         parseInt($('cfgHoldMax').value),
   };
   const secret = $('cfgSecret').value.trim();
   if (secret) data.api_secret = secret;
   const r = await api('/api/config','POST',data);
-  if (r.ok) alert('配置已保存');
-  else alert(r.error || '保存失败');
+  if (r.ok) {
+    updateStrategyDisplay(data);
+    alert('配置已保存，策略参数立即生效');
+  } else {
+    alert(r.error || '保存失败');
+  }
 }
 
 // ══════════════════════════════════════════════════════

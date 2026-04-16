@@ -87,10 +87,11 @@ def api_cfg_post():
     try:
         data = request.get_json(force=True) or {}
         # 类型转换
-        for f in ["position_size_usdt", "min_gain_24h", "min_volume_usdt"]:
+        for f in ["position_size_usdt", "min_gain_24h", "min_volume_usdt",
+                   "order_pct", "stop_loss_pct", "min_profit_pct"]:
             if f in data:
                 data[f] = float(data[f])
-        for f in ["max_positions"]:
+        for f in ["max_positions", "hold_max_s"]:
             if f in data:
                 data[f] = int(data[f])
         if "auto_scan" in data:

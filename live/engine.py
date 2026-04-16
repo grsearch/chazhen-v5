@@ -56,9 +56,11 @@ class Engine:
 
     # ── 客户端构造 ────────────────────────────────
 
-    def _mk_aclient(self) -> Optional[AsyncClient]:
-        k, s = self.cfg.get("api_key",""), self.cfg.get("api_secret","")
-        return AsyncClient(k, s) if k and s else None
+    def _mk_aclient(self) -> AsyncClient:
+        # paper模式不需要Key，但仍需client访问公开接口（精度查询）
+        k = self.cfg.get("api_key", "")
+        s = self.cfg.get("api_secret", "")
+        return AsyncClient(k, s)
 
     def _mk_sclient(self) -> Optional[SyncClient]:
         k, s = self.cfg.get("api_key",""), self.cfg.get("api_secret","")
@@ -278,9 +280,6 @@ class Engine:
                    loop: asyncio.AbstractEventLoop) -> None:
         with self._lock:
             if symbol in self._bots and self._bots[symbol].running:
-                return
-            if not self._aclient:
-                self._log("SYS", f"无 API Key，跳过 {symbol}")
                 return
             bot = Bot(
                 symbol   = symbol,
