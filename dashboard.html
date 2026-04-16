@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>插针Bot v4</title>
+<style>
+:root {
+  --bg:     #0d0f12;
+  --bg2:    #13161b;
+  --bg3:    #1a1e25;
+  --border: #1e2530;
+  --bd2:    #28313d;
+  --text:   #dde3ec;
+  --muted:  #5a6a7e;
+  --dim:    #2d3a48;
+  --green:  #1fd99a;
+  --red:    #f0495a;
+  --amber:  #f5a623;
+  --blue:   #3ab5f0;
+  --purple: #9b7ff5;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 56px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 16px; font-weight: 700; letter-spacing: -.3px; display: flex; align-items: center; gap: 10px; }
+.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.hdr-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--muted); font-family: monospace; }
+.mode-badge { padding: 3px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: .5px; }
+.mode-badge.paper { background: rgba(58,181,240,.12); color: var(--blue); border: 1px solid rgba(58,181,240,.25); }
+.mode-badge.live  { background: rgba(240,73,90,.12);  color: var(--red);  border: 1px solid rgba(240,73,90,.25); }
+.run-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background .3s; }
+.run-dot.on  { background: var(--green); box-shadow: 0 0 6px rgba(31,217,154,.5); }
+.run-dot.off { background: var(--red); }
+
+/* ── Tabs ── */
+nav {
+  display: flex; padding: 0 28px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 12px 20px; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  border-bottom: 2px solid transparent; transition: all .2s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+.pane { display: none; }
+.pane.active { display: block; }
+
+/* ── Layout ── */
+.main { padding: 22px 28px; max-width: 1400px; }
+.row { display: flex; gap: 16px; margin-bottom: 16px; }
+.row.g4 > * { flex: 1; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+@media(max-width:960px) { .row { flex-wrap:wrap; } .row.g4>*{min-width:calc(50% - 8px);} }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px;
+}
+.card-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+}
+
+/* ── Metric ── */
+.metric {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+  position: relative; overflow: hidden;
+}
+.metric::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--ac, var(--green)); border-radius: 3px 0 0 3px;
+}
+.metric-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.metric-value { font-family: monospace; font-size: 24px; font-weight: 700; line-height: 1; }
+.metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: monospace; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 8px 16px; border-radius: 7px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: none; transition: all .15s; white-space: nowrap;
+}
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn-green  { background: var(--green); color: #0d0f12; }
+.btn-green:not(:disabled):hover { filter: brightness(1.1); }
+.btn-red    { background: transparent; color: var(--red); border: 1px solid rgba(240,73,90,.35); }
+.btn-red:not(:disabled):hover { background: rgba(240,73,90,.1); }
+.btn-ghost  { background: var(--bg3); color: var(--text); border: 1px solid var(--bd2); }
+.btn-ghost:hover { border-color: var(--green); color: var(--green); }
+.btn-amber  { background: transparent; color: var(--amber); border: 1px solid rgba(245,166,35,.35); }
+.btn-amber:hover { background: rgba(245,166,35,.08); }
+
+/* ── Symbol list ── */
+.sym-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.sym-list::-webkit-scrollbar { width: 3px; }
+.sym-list::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 2px; }
+.sym-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 11px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 7px;
+}
+.sym-name { font-family: monospace; font-size: 13px; font-weight: 600; }
+.sym-tag {
+  font-size: 10px; padding: 2px 6px; border-radius: 3px; margin-left: 7px;
+  background: rgba(31,217,154,.12); color: var(--green);
+  border: 1px solid rgba(31,217,154,.2);
+}
+.add-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.add-row input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--bd2);
+  border-radius: 7px; padding: 8px 11px; color: var(--text);
+  font-family: monospace; font-size: 12px; outline: none; transition: border-color .2s;
+}
+.add-row input:focus { border-color: var(--green); }
+
+/* ── Orders / Positions ── */
+.order-list { display: flex; flex-direction: column; gap: 8px; }
+.order-card {
+  padding: 11px 13px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-family: monospace; font-size: 12px;
+}
+.order-card .sym { font-weight: 700; font-size: 13px; margin-bottom: 5px; }
+.order-card .row2 { display: flex; gap: 16px; color: var(--muted); }
+.order-card .row2 span b { color: var(--text); }
+
+/* ── Table ── */
+.tbl { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 12px; }
+.tbl th {
+  text-align: left; padding: 9px 12px; color: var(--muted);
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  border-bottom: 1px solid var(--border); font-family: sans-serif;
+}
+.tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tbody tr:hover { background: rgba(255,255,255,.015); }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.neu { color: var(--muted); }
+
+/* ── PnL bars ── */
+.pnl-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; overflow: hidden; }
+.pnl-bar {
+  flex: 1; min-width: 3px; max-width: 12px; border-radius: 2px 2px 0 0;
+  position: relative; cursor: pointer;
+}
+.pnl-bar:hover::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%;
+  transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--bd2);
+  padding: 3px 7px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+  z-index: 10; pointer-events: none;
+}
+
+/* ── Log ── */
+.log-panel {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; height: 220px; overflow-y: auto;
+  font-family: monospace; font-size: 12px; line-height: 1.7;
+}
+.log-panel::-webkit-scrollbar { width: 3px; }
+.log-panel::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 2px; }
+.ll { display: flex; gap: 8px; }
+.lt { color: var(--dim); min-width: 52px; flex-shrink: 0; }
+.ls { color: var(--muted); min-width: 60px; flex-shrink: 0; }
+
+/* ── Config form ── */
+.cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:700px) { .cfg-grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; color: var(--muted); }
+.field input, .field select {
+  background: var(--bg3); border: 1px solid var(--bd2);
+  border-radius: 7px; padding: 8px 11px; color: var(--text);
+  font-family: monospace; font-size: 13px; outline: none; transition: border-color .2s;
+}
+.field input:focus, .field select:focus { border-color: var(--green); }
+.field .hint { font-size: 11px; color: var(--dim); }
+.warn-box {
+  background: rgba(240,73,90,.07); border: 1px solid rgba(240,73,90,.2);
+  border-radius: 7px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 12px; color: var(--red); line-height: 1.6;
+}
+.info-box {
+  background: rgba(31,217,154,.06); border: 1px solid rgba(31,217,154,.15);
+  border-radius: 7px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 12px; color: var(--green); line-height: 1.6;
+}
+
+/* ── Scan status bar ── */
+.scan-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; margin-bottom: 10px; font-size: 12px;
+}
+.scan-bar .left { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.scan-on  { color: var(--green); }
+.scan-off { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot" id="runDot"></div>
+    插针 Bot v4
+  </div>
+  <div class="hdr-right">
+    <span id="modeBadge" class="mode-badge paper">PAPER</span>
+    <span id="hdrSyms">0 币种</span>
+    <span id="hdrTime">--:--:--</span>
+  </div>
+</header>
+
+<nav>
+  <div class="tab active" onclick="switchTab('monitor')">实盘监控</div>
+  <div class="tab" onclick="switchTab('trades')">历史交易</div>
+  <div class="tab" onclick="switchTab('config')">配置</div>
+</nav>
+
+<!-- ══════ 实盘监控 ══════ -->
+<div class="main pane active" id="pane-monitor">
+
+  <!-- 指标行 -->
+  <div class="row g4" style="margin-bottom:16px">
+    <div class="metric">
+      <div class="metric-label">累计盈亏</div>
+      <div class="metric-value" id="m-pnl">0.00</div>
+      <div class="metric-sub">USDT</div>
+    </div>
+    <div class="metric" style="--ac:var(--blue)">
+      <div class="metric-label">总交易次数</div>
+      <div class="metric-value" id="m-trades">0</div>
+      <div class="metric-sub" id="m-wr">胜率 --%</div>
+    </div>
+    <div class="metric" style="--ac:var(--purple)">
+      <div class="metric-label">监控币种</div>
+      <div class="metric-value" id="m-syms">0</div>
+      <div class="metric-sub" id="m-positions">持仓 0 | 挂单 0</div>
+    </div>
+    <div class="metric" style="--ac:var(--amber)">
+      <div class="metric-label">运行状态</div>
+      <div class="metric-value" id="m-status" style="font-size:16px;margin-top:4px">已停止</div>
+      <div class="metric-sub" id="m-mode">-- 模式</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- 左：控制 + 币种管理 -->
+    <div class="col" style="flex:1;min-width:280px">
+
+      <!-- 控制按钮 -->
+      <div class="card">
+        <div class="card-title">运行控制</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-green" id="btnStart" onclick="doStart()">▶ 启动</button>
+          <button class="btn btn-red"   id="btnStop"  onclick="doStop()" disabled>■ 停止</button>
+          <button class="btn btn-ghost" id="btnReset" onclick="doReset()">↺ 重置</button>
+        </div>
+      </div>
+
+      <!-- 监控币种 -->
+      <div class="card" style="flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin:0">监控币种</div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-ghost" id="btnScan" onclick="doScan()"
+              style="padding:5px 11px;font-size:12px">立即扫描</button>
+            <button class="btn" id="btnAutoScan" onclick="toggleAutoScan()"
+              style="padding:5px 11px;font-size:12px;min-width:108px"></button>
+          </div>
+        </div>
+
+        <!-- 自动扫描状态条 -->
+        <div class="scan-bar">
+          <div class="left">
+            <span id="scanIcon">●</span>
+            <span id="scanDesc">每15分钟自动扫描涨幅榜</span>
+          </div>
+          <span id="scanLastTs" style="color:var(--dim);font-size:11px;font-family:monospace"></span>
+        </div>
+
+        <div class="add-row">
+          <input id="addInput" placeholder="手动添加，如 SOLUSDT" onkeydown="if(event.key==='Enter')doAdd()">
+          <button class="btn btn-ghost" onclick="doAdd()" style="padding:7px 13px;font-size:12px">添加</button>
+        </div>
+        <div class="sym-list" id="symList">
+          <div style="color:var(--muted);text-align:center;padding:20px 0;font-size:13px">
+            启动后自动扫描，或手动添加
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：持仓/挂单 + 逐笔PnL + 日志 -->
+    <div class="col" style="flex:1.4;min-width:340px">
+      <div class="card">
+        <div class="card-title">持仓 / 挂单</div>
+        <div class="order-list" id="orderList">
+          <div style="color:var(--muted);text-align:center;padding:16px 0;font-size:13px">暂无持仓或挂单</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">逐笔盈亏</div>
+        <div class="pnl-bars" id="pnlBars">
+          <div style="color:var(--muted);font-size:11px;margin:auto;font-family:monospace">暂无记录</div>
+        </div>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="card-title">实时日志</div>
+        <div class="log-panel" id="logPanel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 历史交易 ══════ -->
+<div class="main pane" id="pane-trades">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="card-title" style="margin:0">历史交易记录</div>
+      <span id="tradeCount" style="font-size:12px;color:var(--muted);font-family:monospace"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>币种</th><th>入场价</th><th>出场价</th><th>数量</th>
+            <th>持仓</th><th>出场原因</th><th>盈亏%</th><th>盈亏U</th><th>模式</th>
+          </tr>
+        </thead>
+        <tbody id="tradeTbody">
+          <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">暂无记录</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 配置 ══════ -->
+<div class="main pane" id="pane-config">
+  <div class="row">
+    <div class="card" style="flex:1">
+      <div class="info-box">
+        策略参数已由回测优化固定：挂单 <b>-2%</b>，持仓最多 <b>10秒</b>，止损 <b>-1%</b>，最小盈利 <b>0.25%</b>。
+      </div>
+      <div id="livewarn" class="warn-box" style="display:none">
+        ⚠ 实盘模式：请确保 API Key 已正确填写，且已开启现货交易权限。
+      </div>
+
+      <div class="cfg-grid">
+        <div class="field">
+          <label>运行模式</label>
+          <select id="cfgMode">
+            <option value="paper">Paper（模拟）</option>
+            <option value="live">Live（实盘）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>每笔仓位 (USDT)</label>
+          <input id="cfgSize" type="number" min="10" step="10">
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input id="cfgKey" type="text" placeholder="实盘必填">
+        </div>
+        <div class="field">
+          <label>API Secret</label>
+          <input id="cfgSecret" type="password" placeholder="实盘必填（不显示）">
+        </div>
+        <div class="field">
+          <label>涨幅榜最低 24h 涨幅 (%)</label>
+          <input id="cfgGain" type="number" min="0" step="5">
+        </div>
+        <div class="field">
+          <label>涨幅榜最低成交量 (USDT)</label>
+          <input id="cfgVol" type="number" min="0" step="100000">
+        </div>
+        <div class="field">
+          <label>同时最多持仓数</label>
+          <input id="cfgMaxPos" type="number" min="1" max="20">
+        </div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:10px">
+        <button class="btn btn-green" onclick="saveCfg()">保存配置</button>
+        <button class="btn btn-ghost" onclick="loadCfgForm()">重新加载</button>
+      </div>
+    </div>
+
+    <div class="card" style="width:280px;flex-shrink:0">
+      <div class="card-title">策略说明</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.9">
+        <p><b style="color:var(--text)">入场</b></p>
+        <p>每根1秒K线收盘后<br>以收盘价 <b style="color:var(--green)">-2%</b> 挂限价买单</p>
+        <br>
+        <p><b style="color:var(--text)">出场（三选一）</b></p>
+        <p>✅ 盈利 ≥ <b style="color:var(--green)">0.25%</b> → 市价卖出</p>
+        <p>🛑 亏损 ≥ <b style="color:var(--red)">1.0%</b> → 止损</p>
+        <p>⏱ 持仓满 <b style="color:var(--amber)">10秒</b> → 强制卖出</p>
+        <br>
+        <p><b style="color:var(--text)">K线未成交</b></p>
+        <p>下一秒收盘时撤单重挂</p>
+        <br>
+        <p style="color:var(--dim)">手续费：单边 0.1%（来回 0.2%）</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// 工具
+// ══════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['monitor','trades','config'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.pane').forEach(p => {
+    p.classList.toggle('active', p.id === 'pane-' + name);
+  });
+  if (name === 'trades') loadTrades();
+  if (name === 'config') loadCfgForm();
+}
+
+async function api(url, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function fmt(n, d=2) { return Number(n).toFixed(d); }
+function nowStr() {
+  return new Date().toLocaleTimeString('zh', {hour12:false});
+}
+
+// ══════════════════════════════════════════════════════
+// 状态轮询
+// ══════════════════════════════════════════════════════
+let _autoScan = true;
+
+async function poll() {
+  try {
+    const s = await api('/api/status');
+    applyStatus(s);
+  } catch(e) { /* 静默失败 */ }
+}
+
+function applyStatus(s) {
+  const running = s.running;
+  const mode    = s.mode || 'paper';
+  const syms    = s.symbols || [];
+
+  // Header
+  $('runDot').className   = 'logo-dot ' + (running ? '' : '');
+  $('runDot').style.background = running ? 'var(--green)' : 'var(--red)';
+  $('runDot').style.animation  = running ? 'pulse 2s infinite' : 'none';
+  $('modeBadge').textContent   = mode.toUpperCase();
+  $('modeBadge').className     = 'mode-badge ' + mode;
+  $('hdrSyms').textContent     = syms.length + ' 币种';
+  $('hdrTime').textContent     = nowStr();
+
+  // 指标
+  const pnl = s.pnl_total || 0;
+  $('m-pnl').textContent  = (pnl >= 0 ? '+' : '') + fmt(pnl, 4);
+  $('m-pnl').style.color  = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  $('m-trades').textContent = s.trade_count || 0;
+  $('m-wr').textContent   = '胜率 ' + (s.win_rate || 0) + '%';
+  $('m-syms').textContent = syms.length;
+
+  const posN = Object.keys(s.positions || {}).length;
+  const ordN = Object.keys(s.orders   || {}).length;
+  $('m-positions').textContent = `持仓 ${posN} | 挂单 ${ordN}`;
+  $('m-status').textContent    = running ? '运行中' : '已停止';
+  $('m-status').style.color    = running ? 'var(--green)' : 'var(--red)';
+  $('m-mode').textContent      = mode === 'live' ? '实盘模式' : '模拟模式';
+
+  // 按钮状态
+  $('btnStart').disabled = running;
+  $('btnStop').disabled  = !running;
+  $('btnReset').disabled = running;
+
+  // 自动扫描状态同步
+  if (typeof s.auto_scan === 'boolean' && s.auto_scan !== _autoScan) {
+    _autoScan = s.auto_scan;
+  }
+  renderAutoScanBtn();
+
+  // 子面板
+  renderSymList(syms, s.positions || {});
+  renderOrders(s.positions || {}, s.orders || {});
+  renderPnlBars(s.pnl_log || []);
+  renderLogs(s.logs || []);
+  renderTradeTbody(s.recent_trades || []);
+  $('scanLastTs').textContent = '上次 ' + nowStr();
+}
+
+// ══════════════════════════════════════════════════════
+// 自动扫描开关
+// ══════════════════════════════════════════════════════
+function renderAutoScanBtn() {
+  const btn  = $('btnAutoScan');
+  const icon = $('scanIcon');
+  const desc = $('scanDesc');
+  if (_autoScan) {
+    btn.className   = 'btn btn-amber';
+    btn.textContent = '⏸ 关闭自动扫描';
+    icon.style.color = 'var(--green)';
+    desc.textContent = '每15分钟自动扫描涨幅榜';
+  } else {
+    btn.className   = 'btn btn-ghost';
+    btn.textContent = '▶ 开启自动扫描';
+    icon.style.color = 'var(--amber)';
+    desc.textContent = '⚠ 自动扫描已关闭（手动模式）';
+  }
+}
+
+async function toggleAutoScan() {
+  _autoScan = !_autoScan;
+  renderAutoScanBtn();
+  await api('/api/config', 'POST', { auto_scan: _autoScan });
+}
+
+// ══════════════════════════════════════════════════════
+// 监控币种列表
+// ══════════════════════════════════════════════════════
+function renderSymList(syms, positions) {
+  const el = $('symList');
+  if (!syms.length) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px 0;font-size:13px">暂无监控币种</div>';
+    return;
+  }
+  el.innerHTML = syms.map(s => {
+    const hasPos = !!positions[s];
+    return `<div class="sym-row">
+      <div style="display:flex;align-items:center">
+        <span class="sym-name">${s}</span>
+        ${hasPos ? '<span class="sym-tag">持仓中</span>' : ''}
+      </div>
+      <button class="btn btn-red" style="padding:3px 10px;font-size:11px"
+        onclick="doRemove('${s}')" ${hasPos ? 'disabled title="有持仓时不可删除"' : ''}>
+        ✕ 删除
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// 持仓 / 挂单面板
+// ══════════════════════════════════════════════════════
+function renderOrders(positions, orders) {
+  const el  = $('orderList');
+  const pos = Object.entries(positions);
+  const ord = Object.entries(orders);
+
+  if (!pos.length && !ord.length) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px 0;font-size:13px">暂无持仓或挂单</div>';
+    return;
+  }
+
+  const html = [];
+  for (const [sym, p] of pos) {
+    const pnl = p.entry_price ? '持仓中' : '';
+    html.push(`<div class="order-card">
+      <div class="sym">${sym} <span style="font-size:10px;color:var(--green);font-weight:400">持仓</span></div>
+      <div class="row2">
+        <span>买入 <b>${Number(p.entry_price).toFixed(6)}</b></span>
+        <span>qty <b>${Number(p.qty).toFixed(4)}</b></span>
+        <span>持仓 <b>${p.hold_s || 0}s</b></span>
+      </div>
+    </div>`);
+  }
+  for (const [sym, o] of ord) {
+    const oo = Array.isArray(o) ? o[0] : o;
+    if (!oo) continue;
+    html.push(`<div class="order-card">
+      <div class="sym">${sym} <span style="font-size:10px;color:var(--blue);font-weight:400">挂单</span></div>
+      <div class="row2">
+        <span>挂价 <b>${Number(oo.price||0).toFixed(6)}</b></span>
+        <span>qty <b>${Number(oo.qty||0).toFixed(4)}</b></span>
+        <span style="color:var(--amber)">-${oo.pct||2}%</span>
+      </div>
+    </div>`);
+  }
+  el.innerHTML = html.join('');
+}
+
+// ══════════════════════════════════════════════════════
+// PnL 柱状图
+// ══════════════════════════════════════════════════════
+function renderPnlBars(log) {
+  const el = $('pnlBars');
+  if (!log.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:11px;margin:auto;font-family:monospace">暂无记录</div>';
+    return;
+  }
+  const last = log.slice(-60);
+  const mx   = Math.max(...last.map(Math.abs), 0.01);
+  el.innerHTML = last.map(v => {
+    const h   = Math.max(4, Math.abs(v) / mx * 60);
+    const col = v >= 0 ? 'var(--green)' : 'var(--red)';
+    return `<div class="pnl-bar" style="height:${h}px;background:${col};opacity:.75"
+      data-tip="${v >= 0 ? '+' : ''}${v.toFixed(3)}%"></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// 日志
+// ══════════════════════════════════════════════════════
+const LOG_KEYWORDS = {
+  '✅': 'var(--green)', '💰': 'var(--green)',
+  '📉': 'var(--red)',   '❌': 'var(--red)', '止损': 'var(--red)',
+  '⚡': 'var(--blue)',  '挂单': 'var(--blue)',
+  '⚠': 'var(--amber)', '超时': 'var(--amber)',
+  '扫描': 'var(--purple)',
+};
+function logColor(msg) {
+  for (const [kw, col] of Object.entries(LOG_KEYWORDS))
+    if (msg.includes(kw)) return col;
+  return 'var(--muted)';
+}
+
+function renderLogs(logs) {
+  const el = $('logPanel');
+  if (!logs.length) { el.innerHTML = '<span style="color:var(--dim)">暂无日志</span>'; return; }
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+  el.innerHTML = logs.slice(0, 80).map(l =>
+    `<div class="ll">
+      <span class="lt">${l.time||''}</span>
+      <span class="ls" style="color:var(--blue)">${(l.symbol||'').slice(0,10)}</span>
+      <span style="color:${logColor(l.msg||'')}">${l.msg||''}</span>
+    </div>`
+  ).join('');
+  if (atBottom) el.scrollTop = 0;
+}
+
+// ══════════════════════════════════════════════════════
+// 交易记录（监控 tab 的迷你版）
+// ══════════════════════════════════════════════════════
+function renderTradeTbody(trades) {
+  const el = $('tradeTbody');
+  if (!trades.length) {
+    el.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">暂无记录</td></tr>';
+    return;
+  }
+  el.innerHTML = trades.map(t => {
+    const pnl = t.pnl_pct || 0;
+    const cls = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'neu';
+    return `<tr>
+      <td style="font-weight:600">${t.symbol||''}</td>
+      <td>${fmt(t.entry_price,6)}</td>
+      <td>${fmt(t.exit_price,6)}</td>
+      <td>${fmt(t.qty,4)}</td>
+      <td>${t.hold_s != null ? t.hold_s+'s' : (t.hold_candles||'-')}</td>
+      <td style="color:var(--muted);font-size:11px">${t.exit_reason||''}</td>
+      <td class="${cls}">${pnl>=0?'+':''}${fmt(pnl,3)}%</td>
+      <td class="${cls}">${(t.pnl_usdt>=0?'+':'') + fmt(t.pnl_usdt,4)}</td>
+      <td><span style="font-size:10px;color:${t.mode==='live'?'var(--red)':'var(--blue)'}">${t.mode||''}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// 历史交易 tab
+// ══════════════════════════════════════════════════════
+async function loadTrades() {
+  try {
+    const d = await api('/api/trades?limit=200');
+    $('tradeCount').textContent = `共 ${d.total || 0} 笔`;
+    renderTradeTbody(d.trades || []);
+    // 复用 renderTradeTbody，指向交易 tab 的 tbody（同 id，简单处理）
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════
+// 控制按钮
+// ══════════════════════════════════════════════════════
+async function doStart() {
+  $('btnStart').disabled = true;
+  const r = await api('/api/start','POST');
+  if (!r.ok) { alert(r.msg || '启动失败'); $('btnStart').disabled = false; }
+  await poll();
+}
+async function doStop() {
+  $('btnStop').disabled = true;
+  await api('/api/stop','POST');
+  await poll();
+}
+async function doReset() {
+  if (!confirm('确认重置所有数据？（仅 paper 模式可用）')) return;
+  const r = await api('/api/reset','POST');
+  if (!r.ok) alert(r.msg || '重置失败');
+  await poll();
+}
+async function doScan() {
+  const btn = $('btnScan');
+  btn.textContent = '扫描中…'; btn.disabled = true;
+  await api('/api/scan','POST');
+  await poll();
+  btn.textContent = '立即扫描'; btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════════════
+// 币种管理
+// ══════════════════════════════════════════════════════
+async function doAdd() {
+  const inp = $('addInput');
+  const sym = inp.value.trim().toUpperCase();
+  if (!sym) return;
+  const r = await api('/api/symbol/add','POST',{symbol:sym});
+  if (r.ok) { inp.value = ''; await poll(); }
+  else alert(r.msg || r.error || '添加失败');
+}
+async function doRemove(sym) {
+  if (!confirm(`确认删除 ${sym} 的监控？\n（若自动扫描开启，下次扫描可能重新添加）`)) return;
+  const r = await api('/api/symbol/remove','POST',{symbol:sym});
+  if (r.ok) await poll();
+  else alert(r.msg || r.error || '删除失败');
+}
+
+// ══════════════════════════════════════════════════════
+// 配置
+// ══════════════════════════════════════════════════════
+async function loadCfgForm() {
+  try {
+    const c = await api('/api/config');
+    $('cfgMode').value   = c.mode || 'paper';
+    $('cfgSize').value   = c.position_size_usdt || 100;
+    $('cfgKey').value    = c.api_key || '';
+    $('cfgSecret').value = '';   // secret 不回显
+    $('cfgGain').value   = c.min_gain_24h || 30;
+    $('cfgVol').value    = c.min_volume_usdt || 500000;
+    $('cfgMaxPos').value = c.max_positions || 3;
+    $('livewarn').style.display = c.mode === 'live' ? 'block' : 'none';
+  } catch(e) {}
+}
+
+$('cfgMode').addEventListener('change', function() {
+  $('livewarn').style.display = this.value === 'live' ? 'block' : 'none';
+});
+
+async function saveCfg() {
+  const data = {
+    mode:               $('cfgMode').value,
+    position_size_usdt: parseFloat($('cfgSize').value),
+    api_key:            $('cfgKey').value.trim(),
+    min_gain_24h:       parseFloat($('cfgGain').value),
+    min_volume_usdt:    parseFloat($('cfgVol').value),
+    max_positions:      parseInt($('cfgMaxPos').value),
+  };
+  const secret = $('cfgSecret').value.trim();
+  if (secret) data.api_secret = secret;
+  const r = await api('/api/config','POST',data);
+  if (r.ok) alert('配置已保存');
+  else alert(r.error || '保存失败');
+}
+
+// ══════════════════════════════════════════════════════
+// 启动
+// ══════════════════════════════════════════════════════
+renderAutoScanBtn();
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
