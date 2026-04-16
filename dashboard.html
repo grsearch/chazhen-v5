@@ -538,7 +538,7 @@ function applyStatus(s) {
 
   // 子面板
   renderSymList(syms, s.positions || {});
-  renderOrders(s.positions || {}, s.orders || {});
+  renderOrders(s.positions || {}, s.orders || {}, s.symbols || [], s.bot_states || {});
   renderPnlBars(s.pnl_log || []);
   renderLogs(s.logs || []);
   renderTradeTbody(s.recent_trades || []);
@@ -598,19 +598,17 @@ function renderSymList(syms, positions) {
 // ══════════════════════════════════════════════════════
 // 持仓 / 挂单面板
 // ══════════════════════════════════════════════════════
-function renderOrders(positions, orders) {
-  const el  = $('orderList');
-  const pos = Object.entries(positions);
-  const ord = Object.entries(orders);
-
-  if (!pos.length && !ord.length) {
+function renderOrders(positions, orders, symbols, botStates) {
+  const el = $('orderList');
+  if (!symbols.length && !Object.keys(positions).length) {
     el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px 0;font-size:13px">暂无持仓或挂单</div>';
     return;
   }
 
   const html = [];
-  for (const [sym, p] of pos) {
-    const pnl = p.entry_price ? '持仓中' : '';
+
+  // 1. 持仓
+  for (const [sym, p] of Object.entries(positions)) {
     html.push(`<div class="order-card">
       <div class="sym">${sym} <span style="font-size:10px;color:var(--green);font-weight:400">持仓</span></div>
       <div class="row2">
@@ -620,19 +618,34 @@ function renderOrders(positions, orders) {
       </div>
     </div>`);
   }
-  for (const [sym, o] of ord) {
-    const oo = Array.isArray(o) ? o[0] : o;
-    if (!oo) continue;
+
+  // 2. 所有监控币种（含挂单和等待中）
+  for (const sym of symbols) {
+    if (positions[sym]) continue; // 已在持仓里显示过
+    const o       = orders[sym];
+    const oo      = o ? (Array.isArray(o) ? o[0] : o) : null;
+    const running = botStates[sym];
+    const tag     = oo
+      ? `<span style="font-size:10px;color:var(--blue);font-weight:400">挂单</span>`
+      : running
+        ? `<span style="font-size:10px;color:var(--muted);font-weight:400">等待K线</span>`
+        : `<span style="font-size:10px;color:var(--red);font-weight:400">Bot未运行</span>`;
+    const detail  = oo
+      ? `<div class="row2">
+           <span>挂价 <b>${Number(oo.price||0).toFixed(6)}</b></span>
+           <span>qty <b>${Number(oo.qty||0).toFixed(4)}</b></span>
+           <span style="color:var(--amber)">-${oo.pct||2}%</span>
+         </div>`
+      : `<div class="row2"><span style="color:var(--dim)">等待下一根1秒K线收盘...</span></div>`;
     html.push(`<div class="order-card">
-      <div class="sym">${sym} <span style="font-size:10px;color:var(--blue);font-weight:400">挂单</span></div>
-      <div class="row2">
-        <span>挂价 <b>${Number(oo.price||0).toFixed(6)}</b></span>
-        <span>qty <b>${Number(oo.qty||0).toFixed(4)}</b></span>
-        <span style="color:var(--amber)">-${oo.pct||2}%</span>
-      </div>
+      <div class="sym">${sym} ${tag}</div>
+      ${detail}
     </div>`);
   }
-  el.innerHTML = html.join('');
+
+  el.innerHTML = html.length
+    ? html.join('')
+    : '<div style="color:var(--muted);text-align:center;padding:16px 0;font-size:13px">暂无持仓或挂单</div>';
 }
 
 // ══════════════════════════════════════════════════════

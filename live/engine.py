@@ -88,8 +88,10 @@ class Engine:
         wr     = round(len(wins) / len(closed) * 100, 1) if closed else 0
 
         positions, orders = {}, {}
+        bot_states = {}
         for sym, bot in self._bots.items():
             st = bot.get_status()
+            bot_states[sym] = st["running"]
             if st["position"]:
                 positions[sym] = st["position"]
             if st["order"]:
@@ -267,6 +269,13 @@ class Engine:
                 self._log("SYS", f"榜单新增: {s}")
                 if loop:
                     self._start_bot(s, loop)
+
+            # 补漏：symbols 里有但没有运行中 Bot 的，也补启动
+            if loop:
+                for s in list(self.state["symbols"]):
+                    if s not in self._bots or not self._bots[s].running:
+                        self._log("SYS", f"补启动 Bot: {s}")
+                        self._start_bot(s, loop)
 
             self._log("SYS",
                 f"扫描完成 +{len(added)} -{len(removed)} "
